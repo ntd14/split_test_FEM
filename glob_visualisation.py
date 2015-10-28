@@ -23,6 +23,14 @@ df['rad_pos'] = (df['rad_pos']-1)*(pi/2)
 df['cirad_strain'] = 11.6*df['cirad']/1000
 df['cirad_stress'] = El*df['cirad_strain']
 
+class cart_cyl(Expression):
+    def eval(self, values, x):
+        tol = 10**(-10)
+
+
+    def value_shape(self):
+        return (3,)
+cart_to_cyl = cart_cyl()
 #function to convert cylindrical to cart and visaversa
 
 # need to some how set the stress/strain at each point we have, 
