@@ -6,6 +6,7 @@ import csv as csv
 wd_path = "/home/nick/git/split_test_FEM/"
 os.chdir(wd_path)
 mesh_list = os.listdir("./final_xml/")
+num_of_samples = 1000
 
 for ii in range(0,len(mesh_list)):
     mesh_list[ii] = ("./final_xml/"+mesh_list[ii])
@@ -16,13 +17,19 @@ num_exist_samps = len(samp_list)
 seed_num = num_exist_samps;
 th = math.pi/5
 
-for ii in range(num_exist_samps,1000):
+for ii in range(num_exist_samps, num_of_samples):
     seed_num = seed_num + 1
     list_out = [[] for kk in range(len(mesh_list))]
     for jj in range(0,len(mesh_list)):
         if mesh_list[jj].startswith("./final_xml/centre_cut.xml"):
             mesh_path = wd_path+"final_xml/centre_cut.xml"
             theta = 0
+            cutp = 1
+            cutn = -1
+
+        elif mesh_list[jj].startswith("./final_xml/qtest.xml"):
+            mesh_path = wd_path+"final_xml/qtest.xml"
+            theta = math.pi/2
             cutp = 1
             cutn = -1
             

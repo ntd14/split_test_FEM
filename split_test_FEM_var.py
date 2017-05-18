@@ -2,8 +2,7 @@ from dolfin import *
 import numpy as np
 import math as math
 import sys as sys
-from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates,\
-    Cell_normal, Cell_cell_normal, Cell_contains
+from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates, Cell_normal, Cell_cell_normal, Cell_contains
 
 mesh_path = sys.argv[1]
 theta = float(sys.argv[2])
@@ -11,13 +10,14 @@ cutp = float(sys.argv[3])
 cutn = float(sys.argv[4])
 seed_num = int(sys.argv[5])
 
-stress_l = 15928235 #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235
-stress_sd_l = 7700536 #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
+stress_l = 19439510 #for argo samples #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235
+stress_sd_l = 8727650 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
 stress_t = stress_l/-3.0
 stress_sd_t = stress_sd_l/3.0
 stress_r = stress_l/-1000.0
 stress_sd_r = stress_sd_l/1000.0
 
+#assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
 rad_slices = 5
 vert_slices = 4
