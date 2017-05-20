@@ -4,17 +4,17 @@ import math as math
 import sys as sys
 from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates, Cell_normal, Cell_cell_normal, Cell_contains
 
-mesh_path = sys.argv[1]
-theta = float(sys.argv[2])
-cutp = float(sys.argv[3])
-cutn = float(sys.argv[4])
-seed_num = int(sys.argv[5])
+mesh_path = "/home/nick/git/split_test_FEM//final_xml/centre_cut.xml"
+theta = 0
+cutp = 1
+cutn = -1
+seed_num = 0
 
 r_devider = 100.0
 t_devider = -3.0
 
-stress_l = -19439510 #for argo samples, + is the residual strain which is left in the stem,    #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235
-stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
+stress_l = 0 #19439510 #for argo samples, + is the residual strain which is left in the stem,    #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235
+stress_sd_l = 1 #8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
 #define these if l and r/t are realted by the means etc their random distrobutions rather than by the specific l value for the cell
 #stress_t = stress_l/-3.0
 #stress_sd_t = stress_sd_l/3.0
@@ -23,80 +23,27 @@ stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -
 
 #assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
-rad_slices = 5
-vert_slices = 4
-num_of_radial_devisions = 4
+rad_slices = 2
+vert_slices = 1
+num_of_radial_devisions = 1
 big_rad = 14.5 # diameter is 29
 small_rad = 12.5
-#slit length = 200
 
-# small rad = 12.5, big rad = 14.5
-# mind cut = 8.33, 10.25
 
-num_of_sd = num_of_radial_devisions * rad_slices * vert_slices
+num_of_sd = 3
 mesh = Mesh(mesh_path)
 np.random.seed(seed_num)
 
 
-#this samples the tan and rad diretion stresses at random,
-#norm_r = np.random.normal(stress_r, stress_sd_r, num_of_sd)
-#norm_t = np.random.normal(stress_t, stress_sd_t, num_of_sd)
-#norm_l = np.random.normal(stress_l, stress_sd_l, num_of_sd)
+class SDSright(SubDomain):
+	def inside(self, x, on_boundary):
+		return x[0]>5
+create_right = SDSright()
 
-#instead this calculates them based on the randomised longatudenal stress
-norm_l = np.random.normal(stress_l, stress_sd_l, num_of_sd)
-norm_t = norm_l/t_devider
-norm_r = norm_l/r_devider
-
-
-
-def irads(max_rad):
-    iR = float(max_rad)/math.sqrt(num_of_radial_devisions)
-    iA = math.pi*iR**2
-    rad_array = np.zeros(num_of_radial_devisions-1)
-    for ii in range(1,num_of_radial_devisions):
-        rad_array[ii-1] = math.sqrt(max_rad**2-(iA*ii)/math.pi)
-    return rad_array[::-1]
-
-
-def calc_rad(h, small_end_rad, big_end_rad):
-    grad = big_end_height/(small_end_rad-big_end_rad)
-    intersept = grad*small_end_rad
-    return (h + intersept)/grad
-
-#create subdomains
-
-z_bound_array = np.zeros(vert_slices+1)
-for ii in range(1,vert_slices+1):
-    z_bound_array[ii] = ii*float(big_end_height)/vert_slices
-    z_bound_array[vert_slices] = z_bound_array[vert_slices] + 0.001
-
-off_set_array = np.zeros(vert_slices+1)
-for ii in range(0, vert_slices+1):
-    off_set_array[ii] = ii*((2*math.pi/rad_slices)/(vert_slices+1))
-
-def tba(cur_height):
-    for ii in range(0, vert_slices):
-        if cur_height >= z_bound_array[ii] and cur_height < z_bound_array[ii+1]:
-            chind = ii
-            break
-
-    thi_bound_array = np.zeros(rad_slices+1)
-    thi_bound_array[0] = 0
-    for ii in range(1,rad_slices+1):
-        thi_bound_array[ii] = thi_bound_array[ii-1]+2*math.pi/rad_slices 
-    thi_bound_array = thi_bound_array + off_set_array[chind]
-    return(thi_bound_array)
-
-def rba(cur_height):
-    crad = calc_rad(cur_height, small_rad, big_rad)
-    rad_array = irads(crad)
-    r_bound_array = np.zeros(num_of_radial_devisions+1)
-    r_bound_array[0] = 0
-    for ii in range(1,len(rad_array)+1):
-        r_bound_array[ii] = rad_array[ii-1]
-    r_bound_array[len(r_bound_array)-1] = 100000
-    return r_bound_array
+class SDSleft(SubDomain):
+	def inside(self, x, on_boundary):
+		return x[0]<-5
+create_left = SDSleft()
 
 parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
@@ -260,61 +207,11 @@ bcs = DirichletBC(VV, c, end_boundary)
 domains = CellFunction("size_t", mesh)
 domains.set_all(0)
 
-def gsm(x):
-        thi_bound_array = tba(x[2])
-        r_bound_array = rba(x[2])
-        for ii in range(0,vert_slices):
-            if x[2] >= z_bound_array[ii] and x[2] < z_bound_array[ii+1]:
-                vh = ii
-                break
-        for jj in range(0,rad_slices):
-                tol = 10**(-10)
-                if x[0] > -tol and x[0] < tol:
-                    if x[1] > tol:
-                        w = math.pi
-                    if x[1] >= -tol and x[1] <= tol:
-                        w = 0
-                    if x[1] < tol:
-                        w = -math.pi
-                else:
-                    w = math.atan(x[1]/x[0])
-                    if x[0]<0 and x[1]>=0:
-                        w = w+math.pi
-                    if x[0]<0 and x[1]<0:
-                        w = w+math.pi
-                    if x[0]>0 and x[1]<0:
-                        w = w+2*math.pi
-                if w >= thi_bound_array[jj] and w < thi_bound_array[jj+1]:
-                    th = jj
-                    break
-                elif w < thi_bound_array[0]:
-                    th = 0
-        for kk in range(0,num_of_radial_devisions):
-                    r = math.sqrt(x[0]**2+x[1]**2)
-                    if r >= r_bound_array[kk] and r < r_bound_array[kk+1]:
-                        rh = kk
-                        break
-        dom = vh*num_of_radial_devisions*rad_slices + th*num_of_radial_devisions + rh
-        return(dom)
+create_left.mark(domains, 1)
+create_right.mark(domains, 2)
 
-#class get_GS(Expression):
-#    def eval(self, values, x):
-#            values[0] = 0#np.random.normal(stress_r, stress_sd_r, 1)
-#            values[1] = 0#np.random.normal(stress_t, stress_sd_t, 1)
-#            values[2] = 10#norm_l[cd]#np.random.normal(stress_l, stress_sd_l, 1)
-#    def value_shape(self):
-#        return (3,)
-#get_gs = get_GS()     
+sds = [0, -19439510,-19439510]
 
-
-for c in cells(mesh):
-    cla = Cell_get_vertex_coordinates(c)
-    cl = np.zeros(3)
-    cl[0] = (cla[0] + cla[3] + cla[6] + cla[9])/4
-    cl[1] = (cla[1] + cla[4] + cla[7] + cla[10])/4
-    cl[2] = (cla[2] + cla[5] + cla[8] + cla[11])/4
-    dom = gsm(cl)
-    domains[c] = dom
 
 dx = Measure("dx")[domains]
 
@@ -334,11 +231,13 @@ stress4s = CMF[3,0]*E[0,0] + CMF[3,1]*E[1,1] + CMF[3,2]*(E[2,2]) + CMF[3,3]*E[1,
 stress5s = CMF[4,0]*E[0,0] + CMF[4,1]*E[1,1] + CMF[4,2]*(E[2,2]) + CMF[4,3]*E[1,2] + CMF[4,4]*E[0,2] + CMF[4,5]*E[0,1]
 stress6s = CMF[5,0]*E[0,0] + CMF[5,1]*E[1,1] + CMF[5,2]*(E[2,2]) + CMF[5,3]*E[1,2] + CMF[5,4]*E[0,2] + CMF[5,5]*E[0,1] 
 
+
+
 #psi = 0.5*((stress1s+0)*E[0,0]+(stress2s+0)*E[1,1]+(stress3s+1000)*(E[2,2])+stress4s*E[1,2]+stress5s*E[0,2]+stress6s*E[0,1])
 # Total potential energy
 Pi = 0
 for ii in range(0,num_of_sd):
-    Pi = Pi + (0.5*((stress1s+norm_r[ii])*E[0,0]+(stress2s+norm_t[ii])*E[1,1]+(stress3s+norm_l[ii])*(E[2,2])+stress4s*E[1,2]+stress5s*E[0,2]+stress6s*E[0,1]))*dx(ii)
+    Pi = Pi + (0.5*((stress1s + sds[ii])*E[0,0]+(stress2s)*E[1,1]+(stress3s)*(E[2,2])+stress4s*E[1,2]+stress5s*E[0,2]+stress6s*E[0,1]))*dx(ii)
 
 # Compute first variation of Pi (directional derivative about u in the direction of v)
 F = derivative(Pi, u, v)
@@ -464,6 +363,11 @@ with open('tfile_var.csv', 'wb') as fh:
     fh.write(str(measure))
 fh.close()
 
-
-
+sm = SubMesh(mesh, domains, 0)
+plot(sm, interactive = True)
+sm = SubMesh(mesh, domains, 1)
+plot(sm, interactive = True)
+sm = SubMesh(mesh, domains, 2)
+plot(sm, interactive = True)
+plot(u, mode = "displacement", title = "single, u", interactive =True)
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html
