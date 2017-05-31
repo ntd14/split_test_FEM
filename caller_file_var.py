@@ -6,7 +6,7 @@ import csv as csv
 wd_path = "/home/nick/git/split_test_FEM/"
 os.chdir(wd_path)
 mesh_list = os.listdir("./final_xml/")
-num_of_samples = 10
+num_of_samples = 1000
 
 for ii in range(0,len(mesh_list)):
     mesh_list[ii] = ("./final_xml/"+mesh_list[ii])

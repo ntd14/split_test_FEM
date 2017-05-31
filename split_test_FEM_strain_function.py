@@ -11,8 +11,8 @@ cutn = -1
 seed_num = 0
 
 
-r_devider = -5.0 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
-t_devider = -5.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
+r_devider = -10.0 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
+t_devider = -10.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
 
 
 stress_l = 19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
@@ -22,32 +22,16 @@ stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -
 #stress_sd_t = stress_sd_l/3.0
 #stress_r = stress_l/-1000.0
 #stress_sd_r = stress_sd_l/1000.0
+#stress_l = stress_l/2.0
 
 #assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
-rad_slices = 8
-vert_slices = 1
-num_of_radial_devisions = 3 # if not 3, new code needs to be inplemented
 big_rad = 14.5 # diameter is 29
 small_rad = 12.5
 
 
-num_of_sd = num_of_radial_devisions * rad_slices * vert_slices
 mesh = Mesh(mesh_path)
 np.random.seed(seed_num)
-
-norm_l = np.zeros(num_of_sd)
-l_vals = np.random.normal(stress_l, stress_sd_l, 1)
-for ii in range(0, num_of_sd):
-	if ii%num_of_radial_devisions == 0:
-		norm_l[ii] = -1*np.random.normal(stress_l, stress_sd_l, 1)[0]/2.0 #as what we measure with the splitting test is the stress gradiant, the pith expands and the pirphery contracts in the test, below we generate a pith value, then reverse the sign for piriphery, hence the full splitting test value is represented from half of the input. 
-	elif ii%num_of_radial_devisions == 2:
-		norm_l[ii] = -1*norm_l[ii - 2]
-	elif ii%num_of_radial_devisions != 1:
-		print('check "num_of_radial_devisions" parameter is devisable by 3')
-
-norm_t = norm_l/t_devider
-norm_r = norm_l/r_devider
 
 
 def irads(max_rad):
@@ -64,39 +48,23 @@ def calc_rad(h, small_end_rad, big_end_rad):
     intersept = grad*small_end_rad
     return (h + intersept)/grad
 
-#create subdomains
 
-z_bound_array = np.zeros(vert_slices+1)
-for ii in range(1,vert_slices+1):
-    z_bound_array[ii] = ii*float(big_end_height)/vert_slices
-    z_bound_array[vert_slices] = z_bound_array[vert_slices] + 0.001
+class vstress(Expression):
+    def eval(self, values, x):
+	mr = calc_rad(x[2], small_rad, big_rad)
+        rad = sqrt(x[0]**2+x[1]**2)
 
-off_set_array = np.zeros(vert_slices+1)
-for ii in range(0, vert_slices+1):
-    off_set_array[ii] = ii*((2*math.pi/rad_slices)/(vert_slices+1))
+	if(rad < 0.22313*mr):
+		rad = 0.22313*mr
 
-def tba(cur_height):
-    for ii in range(0, vert_slices):
-        if cur_height >= z_bound_array[ii] and cur_height < z_bound_array[ii+1]:
-            chind = ii
-            break
+	GSv = stress_l*(1 + 2*math.log(rad/mr)) 
 
-    thi_bound_array = np.zeros(rad_slices+1)
-    thi_bound_array[0] = 0
-    for ii in range(1,rad_slices+1):
-        thi_bound_array[ii] = thi_bound_array[ii-1]+2*math.pi/rad_slices 
-    thi_bound_array = thi_bound_array + off_set_array[chind]
-    return(thi_bound_array)
+        values[0] = GSv
+    def value_shape(self):
+        return (1,)
+GSV = vstress()
 
-def rba(cur_height):
-    crad = calc_rad(cur_height, small_rad, big_rad)
-    rad_array = irads(crad)
-    r_bound_array = np.zeros(num_of_radial_devisions+1)
-    r_bound_array[0] = 0
-    for ii in range(1,len(rad_array)+1):
-        r_bound_array[ii] = rad_array[ii-1]
-    r_bound_array[len(r_bound_array)-1] = 100000
-    return r_bound_array
+
 
 parameters["form_compiler"]["cpp_optimize"] = True
 parameters["form_compiler"]["optimize"] = True
@@ -259,44 +227,7 @@ c = Expression(("0.0", "0.0", "0.0"))
 bcs = DirichletBC(VV, c, end_boundary)
 
 domains = CellFunction("size_t", mesh)
-domains.set_all(0)
 
-def gsm(x):
-        thi_bound_array = tba(x[2])
-        r_bound_array = rba(x[2])
-        for ii in range(0,vert_slices):
-            if x[2] >= z_bound_array[ii] and x[2] < z_bound_array[ii+1]:
-                vh = ii
-                break
-        for jj in range(0,rad_slices):
-                tol = 10**(-10)
-                if x[0] > -tol and x[0] < tol:
-                    if x[1] > tol:
-                        w = math.pi
-                    if x[1] >= -tol and x[1] <= tol:
-                        w = 0
-                    if x[1] < tol:
-                        w = -math.pi
-                else:
-                    w = math.atan(x[1]/x[0])
-                    if x[0]<0 and x[1]>=0:
-                        w = w+math.pi
-                    if x[0]<0 and x[1]<0:
-                        w = w+math.pi
-                    if x[0]>0 and x[1]<0:
-                        w = w+2*math.pi
-                if w >= thi_bound_array[jj] and w < thi_bound_array[jj+1]:
-                    th = jj
-                    break
-                elif w < thi_bound_array[0]:
-                    th = 0
-        for kk in range(0,num_of_radial_devisions):
-                    r = math.sqrt(x[0]**2+x[1]**2)
-                    if r >= r_bound_array[kk] and r < r_bound_array[kk+1]:
-                        rh = kk
-                        break
-        dom = vh*num_of_radial_devisions*rad_slices + th*num_of_radial_devisions + rh
-        return(dom)
 
 #class get_GS(Expression):
 #    def eval(self, values, x):
@@ -307,35 +238,25 @@ def gsm(x):
 #        return (3,)
 #get_gs = get_GS()     
 
-
-for c in cells(mesh):
-    cla = Cell_get_vertex_coordinates(c)
-    cl = np.zeros(3)
-    cl[0] = (cla[0] + cla[3] + cla[6] + cla[9])/4
-    cl[1] = (cla[1] + cla[4] + cla[7] + cla[10])/4
-    cl[2] = (cla[2] + cla[5] + cla[8] + cla[11])/4
-    dom = gsm(cl)
-    domains[c] = dom
-
-dx = Measure("dx")[domains]
-
 du = TrialFunction(VV)            # Incremental displacement
 v  = TestFunction(VV)             # Test function
 u  = Function(VV)                 # Displacement from previous iteration
 E = 0.5*(grad(u)+(grad(u)).T) 
 
-stress1s = CMF[0,0]*E[0,0] + CMF[0,1]*E[1,1] + CMF[0,2]*(E[2,2]) + CMF[0,3]*E[1,2] + CMF[0,4]*E[0,2] + CMF[0,5]*E[0,1]
-stress2s = CMF[1,0]*E[0,0] + CMF[1,1]*E[1,1] + CMF[1,2]*(E[2,2]) + CMF[1,3]*E[1,2] + CMF[1,4]*E[0,2] + CMF[1,5]*E[0,1]
-stress3s = CMF[2,0]*E[0,0] + CMF[2,1]*E[1,1] + CMF[2,2]*(E[2,2]) + CMF[2,3]*E[1,2] + CMF[2,4]*E[0,2] + CMF[2,5]*E[0,1]
+GSv = GSV[0]
+
+stress1s = CMF[0,0]*E[0,0] + CMF[0,1]*E[1,1] + CMF[0,2]*(E[2,2]) + CMF[0,3]*E[1,2] + CMF[0,4]*E[0,2] + CMF[0,5]*E[0,1] + GSv/r_devider
+stress2s = CMF[1,0]*E[0,0] + CMF[1,1]*E[1,1] + CMF[1,2]*(E[2,2]) + CMF[1,3]*E[1,2] + CMF[1,4]*E[0,2] + CMF[1,5]*E[0,1] + GSv/t_devider
+stress3s = CMF[2,0]*E[0,0] + CMF[2,1]*E[1,1] + CMF[2,2]*(E[2,2]) + CMF[2,3]*E[1,2] + CMF[2,4]*E[0,2] + CMF[2,5]*E[0,1] + GSv
 stress4s = CMF[3,0]*E[0,0] + CMF[3,1]*E[1,1] + CMF[3,2]*(E[2,2]) + CMF[3,3]*E[1,2] + CMF[3,4]*E[0,2] + CMF[3,5]*E[0,1]
 stress5s = CMF[4,0]*E[0,0] + CMF[4,1]*E[1,1] + CMF[4,2]*(E[2,2]) + CMF[4,3]*E[1,2] + CMF[4,4]*E[0,2] + CMF[4,5]*E[0,1]
 stress6s = CMF[5,0]*E[0,0] + CMF[5,1]*E[1,1] + CMF[5,2]*(E[2,2]) + CMF[5,3]*E[1,2] + CMF[5,4]*E[0,2] + CMF[5,5]*E[0,1] 
 
 #psi = 0.5*((stress1s+0)*E[0,0]+(stress2s+0)*E[1,1]+(stress3s+1000)*(E[2,2])+stress4s*E[1,2]+stress5s*E[0,2]+stress6s*E[0,1])
 # Total potential energy
-Pi = 0
-for ii in range(0,num_of_sd):
-    Pi = Pi + (0.5*((stress1s+norm_r[ii])*E[0,0]+(stress2s+norm_t[ii])*E[1,1]+(stress3s+norm_l[ii])*(E[2,2])+stress4s*E[1,2]+stress5s*E[0,2]+stress6s*E[0,1]))*dx(ii)
+
+
+Pi = (0.5*((stress1s)*E[0,0]+(stress2s)*E[1,1]+(stress3s)*(E[2,2])+stress4s*E[1,2]+stress5s*E[0,2]+stress6s*E[0,1]))*dx
 
 # Compute first variation of Pi (directional derivative about u in the direction of v)
 F = derivative(Pi, u, v)
@@ -344,8 +265,8 @@ F = derivative(Pi, u, v)
 J = derivative(F, u, du)
 
 # Solve variational problem
-#solve(F == 0, u, bcs, J=J,
-#      form_compiler_parameters=ffc_options)
+#parameters.form_compiler.quadrature_degree = 2
+solve(F == 0, u, bcs, J=J, form_compiler_parameters=ffc_options)
 
 
 #plot(u, mode = "displacement", interactive = True)
@@ -462,11 +383,7 @@ measure = np.mean(disp_vec)
 #    fh.write(str(measure))
 #fh.close()
 
-
-for ii in range(0,num_of_sd):
-    sm = SubMesh(mesh, domains, ii)
-    print(sm.num_cells())
-    #plot(sm, interactive = True)
+print(measure)
 
 plot(u, mode = "displacement", title = "single, u", interactive =True)
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html

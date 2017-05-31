@@ -9,7 +9,7 @@ num_samples = len(sample_list)
 for ii in range(0,num_samples):
     sample_list[ii] = ("./samples_var/"+sample_list[ii])
 
-headers = ["sample_type", "theta", "cutp", "cutn", "seed_num","mes", "sample_num"]
+headers = ["sample_type", "theta", "cutp", "cutn", "seed_num","mes", "stress_mean", "sample_num"]
 
 df = pds.read_csv(sample_list[0],names=headers)
 

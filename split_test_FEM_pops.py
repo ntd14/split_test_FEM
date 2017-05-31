@@ -4,18 +4,17 @@ import math as math
 import sys as sys
 from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates, Cell_normal, Cell_cell_normal, Cell_contains
 
-mesh_path = "/home/nick/git/split_test_FEM//final_xml/centre_cut.xml"
-theta = 0
-cutp = 1
-cutn = -1
-seed_num = 0
+mesh_path = sys.argv[1]
+theta = float(sys.argv[2])
+cutp = float(sys.argv[3])
+cutn = float(sys.argv[4])
+seed_num = int(sys.argv[5])
+stress_l = float(sys.argv[6])
 
-
-r_devider = -5.0 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
+r_devider = -5.0 #  jacobs 1945 values in psi come to about 10 - stresses and strains in tree tunks as they grow
 t_devider = -5.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
 
-
-stress_l = 19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
+#stress_l = 19439510 #for argo samples, + is the residual strain which is left in the stem,    #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235; jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value (ie expantion in the pith of 2800psi)
 stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
 #define these if l and r/t are realted by the means etc their random distrobutions rather than by the specific l value for the cell
 #stress_t = stress_l/-3.0
@@ -26,15 +25,19 @@ stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -
 #assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
 rad_slices = 8
-vert_slices = 1
-num_of_radial_devisions = 3 # if not 3, new code needs to be inplemented
+vert_slices = 4
+num_of_radial_devisions = 3
 big_rad = 14.5 # diameter is 29
 small_rad = 12.5
+#slit length = 200
 
+# small rad = 12.5, big rad = 14.5
+# mind cut = 8.33, 10.25
 
 num_of_sd = num_of_radial_devisions * rad_slices * vert_slices
 mesh = Mesh(mesh_path)
 np.random.seed(seed_num)
+
 
 norm_l = np.zeros(num_of_sd)
 l_vals = np.random.normal(stress_l, stress_sd_l, 1)
@@ -48,6 +51,7 @@ for ii in range(0, num_of_sd):
 
 norm_t = norm_l/t_devider
 norm_r = norm_l/r_devider
+
 
 
 def irads(max_rad):
@@ -319,6 +323,10 @@ for c in cells(mesh):
 
 dx = Measure("dx")[domains]
 
+#for ii in range(0,num_of_sd):
+#    sm = SubMesh(mesh, domains, ii)
+#    plot(sm, interactive = True)
+
 du = TrialFunction(VV)            # Incremental displacement
 v  = TestFunction(VV)             # Test function
 u  = Function(VV)                 # Displacement from previous iteration
@@ -344,8 +352,8 @@ F = derivative(Pi, u, v)
 J = derivative(F, u, du)
 
 # Solve variational problem
-#solve(F == 0, u, bcs, J=J,
-#      form_compiler_parameters=ffc_options)
+solve(F == 0, u, bcs, J=J,
+      form_compiler_parameters=ffc_options)
 
 
 #plot(u, mode = "displacement", interactive = True)
@@ -385,7 +393,6 @@ for ij in range(0,len(map_mat)):
             coor_cur[map_mat[ij,0],1] = map_mat[ij,2]
         if map_mat[ij,1] == 2:
             coor_cur[map_mat[ij,0],2] = map_mat[ij,2] 
-
 
 
 mesh_coor = mesh.coordinates()
@@ -455,18 +462,14 @@ disp_vec = mcc[mindp, 0] - mcc[mindn,0]
 #    print("theta value poorly defined")
 measure = np.mean(disp_vec)
 
-#print(disp_vec)
-#print(np.mean(disp_vec))
+print(disp_vec)
+print(stress_l)
+print(np.mean(disp_vec))
 
-#with open('tfile_var.csv', 'wb') as fh:
-#    fh.write(str(measure))
-#fh.close()
+with open('tfile_var.csv', 'wb') as fh:
+    fh.write(str(measure))
+fh.close()
 
+#note opening for average sample should be ~4.2
 
-for ii in range(0,num_of_sd):
-    sm = SubMesh(mesh, domains, ii)
-    print(sm.num_cells())
-    #plot(sm, interactive = True)
-
-plot(u, mode = "displacement", title = "single, u", interactive =True)
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html

@@ -10,10 +10,10 @@ cutp = float(sys.argv[3])
 cutn = float(sys.argv[4])
 seed_num = int(sys.argv[5])
 
-r_devider = 100.0
-t_devider = -3.0
+r_devider = -5.0 #  jacobs 1945 values in psi come to about 10 - stresses and strains in tree tunks as they grow
+t_devider = -5.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
 
-stress_l = -19439510 #for argo samples, + is the residual strain which is left in the stem,    #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235
+stress_l = 19439510 #for argo samples, + is the residual strain which is left in the stem,    #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235; jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value (ie expantion in the pith of 2800psi)
 stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
 #define these if l and r/t are realted by the means etc their random distrobutions rather than by the specific l value for the cell
 #stress_t = stress_l/-3.0
@@ -23,9 +23,9 @@ stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -
 
 #assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
-rad_slices = 5
+rad_slices = 8
 vert_slices = 4
-num_of_radial_devisions = 4
+num_of_radial_devisions = 3
 big_rad = 14.5 # diameter is 29
 small_rad = 12.5
 #slit length = 200
@@ -38,13 +38,16 @@ mesh = Mesh(mesh_path)
 np.random.seed(seed_num)
 
 
-#this samples the tan and rad diretion stresses at random,
-#norm_r = np.random.normal(stress_r, stress_sd_r, num_of_sd)
-#norm_t = np.random.normal(stress_t, stress_sd_t, num_of_sd)
-#norm_l = np.random.normal(stress_l, stress_sd_l, num_of_sd)
+norm_l = np.zeros(num_of_sd)
+l_vals = np.random.normal(stress_l, stress_sd_l, 1)
+for ii in range(0, num_of_sd):
+	if ii%num_of_radial_devisions == 0:
+		norm_l[ii] = -1*np.random.normal(stress_l, stress_sd_l, 1)[0]/2.0 #as what we measure with the splitting test is the stress gradiant, the pith expands and the pirphery contracts in the test, below we generate a pith value, then reverse the sign for piriphery, hence the full splitting test value is represented from half of the input. 
+	elif ii%num_of_radial_devisions == 2:
+		norm_l[ii] = -1*norm_l[ii - 2]
+	elif ii%num_of_radial_devisions != 1:
+		print('check "num_of_radial_devisions" parameter is devisable by 3')
 
-#instead this calculates them based on the randomised longatudenal stress
-norm_l = np.random.normal(stress_l, stress_sd_l, num_of_sd)
 norm_t = norm_l/t_devider
 norm_r = norm_l/r_devider
 
@@ -144,9 +147,10 @@ trans = trans_angles()
 def end_boundary(x, on_boundary):
     return abs(x[2]) < 0.001
 
+#Elastic constants of wood determined by ultrasound using three geometries of specimens cover all 9 elastic constants for E. siligna
 E3 = 11.33*1000000000
-E2 = E3/10.0
-E1 = E3/20.0
+E2 = E3/6.5
+E1 = E3/4.3
 V21 = 0.36##Swapping these goes from +x, -y to +x +y.
 V12 = V21*E1/E2##
 V31 = 0.36#### no change
@@ -464,6 +468,6 @@ with open('tfile_var.csv', 'wb') as fh:
     fh.write(str(measure))
 fh.close()
 
-
+#note opening for average sample should be ~4.2
 
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html
