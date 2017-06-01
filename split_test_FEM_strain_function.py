@@ -1,6 +1,7 @@
 from dolfin import *
 import numpy as np
 import math as math
+import scipy.interpolate as inp
 import sys as sys
 from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates, Cell_normal, Cell_cell_normal, Cell_contains
 
@@ -11,8 +12,8 @@ cutn = -1
 seed_num = 0
 
 
-r_devider = -10.0 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
-t_devider = -10.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
+r_devider = -5.0 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
+t_devider = -5.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
 
 
 stress_l = 19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
@@ -29,6 +30,47 @@ big_end_height = 400 #assumed small end centred on origin
 big_rad = 14.5 # diameter is 29
 small_rad = 12.5
 
+### TRIAL
+big_rad = big_rad*1.3637
+small_rad = small_rad*1.3637
+
+
+#generate coordinates and predetermind stress modifiers
+num_rad_slices = 6 #includes 0 and periphary ie 4 is two internal slices, 3 internal volumes
+num_theta_slices = 8
+num_vert_slices = 8 # includes ends, 3 is big and small end and one hlaf way, ie has two internal volumes
+
+#if statment to check num vert slices isnt 0
+
+def calc_rad(h, small_end_rad, big_end_rad):
+    grad = big_end_height/(big_end_rad-small_end_rad)
+    intersept = grad*small_end_rad
+    return (h + intersept)/grad
+
+
+
+theta_slices = np.linspace(0, num_theta_slices-1, num_theta_slices)*np.pi/num_theta_slices
+theta_slices_array = np.repeat(theta_slices, (num_rad_slices))
+
+kstress = []
+for vsn in range(0, num_vert_slices):
+	h = vsn*big_end_height/(num_vert_slices-1)
+	cmr = calc_rad(h, small_rad, big_rad)
+	r_slices = np.linspace(0, num_rad_slices-1, num_rad_slices)*cmr/(num_rad_slices-1)
+	r_slices_array = np.tile(r_slices, (num_theta_slices))
+	kstress_x = r_slices_array*np.cos(theta_slices_array)
+	kstress_y = r_slices_array*np.sin(theta_slices_array)
+	kstress_x = np.append(kstress_x, kstress_x*-1)
+	kstress_y = np.append(kstress_y, kstress_y*-1)
+	kstress_t = np.dstack((kstress_x, kstress_y, np.ones(len(kstress_x))*h))
+	kstress = np.append(kstress, kstress_t)
+
+kstress = np.reshape(kstress, (len(kstress)/3, 3))
+kstress_cv = np.reshape(np.random.normal(0, stress_sd_l, len(kstress[:,1])), (len(kstress[:,1]), 1))
+kstress = np.append(kstress, kstress_cv, axis=1)
+
+interp = inp.LinearNDInterpolator(kstress[:,0:3], kstress[:,3], fill_value=0)
+
 
 mesh = Mesh(mesh_path)
 np.random.seed(seed_num)
@@ -43,10 +85,7 @@ def irads(max_rad):
     return rad_array[::-1]
 
 
-def calc_rad(h, small_end_rad, big_end_rad):
-    grad = big_end_height/(small_end_rad-big_end_rad)
-    intersept = grad*small_end_rad
-    return (h + intersept)/grad
+
 
 
 class vstress(Expression):
@@ -54,10 +93,10 @@ class vstress(Expression):
 	mr = calc_rad(x[2], small_rad, big_rad)
         rad = sqrt(x[0]**2+x[1]**2)
 
-	if(rad < 0.22313*mr):
+	if(rad < 0.22313*mr): 
 		rad = 0.22313*mr
 
-	GSv = stress_l*(1 + 2*math.log(rad/mr)) 
+	GSv = stress_l*(1 + 2*math.log(rad/mr))  + interp(x[0], x[1], x[2])
 
         values[0] = GSv
     def value_shape(self):
