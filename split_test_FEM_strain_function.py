@@ -5,10 +5,10 @@ import scipy.interpolate as inp
 import sys as sys
 from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates, Cell_normal, Cell_cell_normal, Cell_contains
 
-mesh_path = "/home/nick/git/split_test_FEM//final_xml/centre_cut.xml"
-theta = 0
-cutp = 1
-cutn = -1
+mesh_path = "/home/nick/git/split_test_FEM//final_xml/cut_second.xml"
+theta = -1*math.pi/2.0
+cutp = 5.0
+cutn = -5.0
 seed_num = 0
 
 
@@ -27,12 +27,11 @@ stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -
 
 #assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
-big_rad = 14.5 # diameter is 29
-small_rad = 12.5
+bed = 39.55 # diameter is 29
+sed = 35.99
 
-### TRIAL
-big_rad = big_rad*1.3637
-small_rad = small_rad*1.3637
+big_rad = bed/2.0
+small_rad = sed/2.0 
 
 
 #generate coordinates and predetermind stress modifiers
@@ -305,7 +304,7 @@ J = derivative(F, u, du)
 
 # Solve variational problem
 #parameters.form_compiler.quadrature_degree = 2
-solve(F == 0, u, bcs, J=J, form_compiler_parameters=ffc_options)
+#solve(F == 0, u, bcs, J=J, form_compiler_parameters=ffc_options)
 
 
 #plot(u, mode = "displacement", interactive = True)
@@ -353,67 +352,78 @@ mesh_coor = mesh.coordinates()
 mind = np.where(mesh_coor[:,2]>399)
 mind = mind[0]
 
-top_points = np.zeros((len(mind),2))
-cur_points = np.zeros((len(mind),2))
-for ii in range(0,len(top_points)):
-    top_points[ii,0] = mesh_coor[mind[ii],0]*math.cos(theta) + mesh_coor[mind[ii],1]*(-math.sin(theta))
-    top_points[ii,1] = mesh_coor[mind[ii],0]*math.sin(theta) + mesh_coor[mind[ii],1]*math.cos(theta)
-    cur_points[ii,0] = coor_cur[mind[ii],0]*math.cos(theta) + coor_cur[mind[ii],1]*(-math.sin(theta))
-    cur_points[ii,1] = coor_cur[mind[ii],0]*math.sin(theta) + coor_cur[mind[ii],1]*math.cos(theta)
-
-mct = mesh_coor
-mcc = coor_cur
-for ii in range(0,len(top_points)):
-    mct[mind[ii],0] = top_points[ii,0]
-    mct[mind[ii],1] = top_points[ii,1]
-    mcc[mind[ii],0] = cur_points[ii,0]
-    mcc[mind[ii],1] = cur_points[ii,1]
-
-
-mindp = np.where((mct[:,2]>399) & (mct[:,0]<cutp) & (mct[:,0]>cutp-1))
+#top_points = np.zeros((len(mind),2))
+#cur_points = np.zeros((len(mind),2))
+#for ii in range(0,len(top_points)):
+#    top_points[ii,0] = mesh_coor[mind[ii],0]*math.cos(theta) + mesh_coor[mind[ii],1]*(-math.sin(theta))
+#    top_points[ii,1] = mesh_coor[mind[ii],0]*math.sin(theta) + mesh_coor[mind[ii],1]*math.cos(theta)
+#    cur_points[ii,0] = coor_cur[mind[ii],0]*math.cos(theta) + coor_cur[mind[ii],1]*(-math.sin(theta))
+#    cur_points[ii,1] = coor_cur[mind[ii],0]*math.sin(theta) + coor_cur[mind[ii],1]*math.cos(theta)
+#
+#mct = mesh_coor
+#mcc = coor_cur
+#for ii in range(0,len(top_points)):
+#    mct[mind[ii],0] = top_points[ii,0]
+#    mct[mind[ii],1] = top_points[ii,1]
+#    mcc[mind[ii],0] = cur_points[ii,0]
+#    mcc[mind[ii],1] = cur_points[ii,1]
+#
+#
+#mindp = np.where((mct[:,2]>399) & (mct[:,0]<cutp) & (mct[:,0]>cutp-1))
 #mindp = np.where((mesh_coor[:,2]>399) & (mesh_coor[:,0]<cutp) & (mesh_coor[:,0]>cutp-1))
-
-mindp = mindp[0]
-mindn = np.where((mct[:,2]>399) & (mct[:,0]>cutn) & (mct[:,0]<cutn+1))
-
+#
+#mindp = mindp[0]
+#mindn = np.where((mct[:,2]>399) & (mct[:,0]>cutn) & (mct[:,0]<cutn+1))
+#print(mindn)
 #mindn = np.where((mesh_coor[:,2]>399) & (mesh_coor[:,0]>cutn) & (mesh_coor[:,0]<cutn+1))
-mindn = mindn[0]
-if len(mindn) > len(mindp):
-    print("diferent num of elements on each side of cut")
-    ef = 0
-    while len(mindn) > len(mindp):
-        print(len(mindn), len(mindp))
-        if ef==0:
-            mindn = np.delete(mindn, 0)
-            ef = 1
-        elif ef==1:
-            mindn = np.delete(mindn, len(mindn)-1)
-            ef = 0
-        else:
-            print("ef val != 0, 1")
-        
-elif len(mindn) < len(mindp):
-    print("diferent num of elements on each side of cut")
-    ef = 0
-    while  len(mindp) > len(mindn):
-        print(len(mindp), len(mindn))
-        if ef==0:
-            mindp = np.delete(mindp, 0)
-            ef = 1
-        elif ef==1:
-            mindp = np.delete(mindp, len(mindp)-1)
-            ef = 0
-        else:
-            print("ef val != 0, 1")        
+#mindn = mindn[0]
+#if len(mindn) > len(mindp):
+#    print("diferent num of elements on each side of cut")
+#    ef = 0
+#    while len(mindn) > len(mindp):
+#        print(len(mindn), len(mindp))
+#        if ef==0:
+#            mindn = np.delete(mindn, 0)
+#            ef = 1
+#        elif ef==1:
+#            mindn = np.delete(mindn, len(mindn)-1)
+#            ef = 0
+#        else:
+#            print("ef val != 0, 1")
+#        
+#elif len(mindn) < len(mindp):
+#    print("diferent num of elements on each side of cut")
+#    ef = 0
+#    while  len(mindp) > len(mindn):
+#        print(len(mindp), len(mindn))
+#        if ef==0:
+#            mindp = np.delete(mindp, 0)
+#            ef = 1
+#        elif ef==1:
+#            mindp = np.delete(mindp, len(mindp)-1)
+#            ef = 0
+#        else:
+#            print("ef val != 0, 1")        
 
 
+if theta == 0:
+	print(np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0])))
+	print(np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0])))
+	measure = np.mean((np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0]))) + (np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0]))))
+elif theta == -1*math.pi/2.0:
+	print(np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0])))
+	print(np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0])))
+	measure = np.mean((np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0]))) + (np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0]))))
+
+print(measure)
 #if(abs(theta) <= math.pi/2):
-disp_vec = mcc[mindp, 0] - mcc[mindn,0]
+#disp_vec = mcc[mindp, 0] - mcc[mindn,0]
 #elif(abs(theta) > math.pi/2):
 #    disp_vec = coor_cur[mindn,0] - coor_cur[mindp, 0]
 #else:
 #    print("theta value poorly defined")
-measure = np.mean(disp_vec)
+#measure = np.mean(disp_vec)
+
 
 #print(disp_vec)
 #print(np.mean(disp_vec))
@@ -422,7 +432,7 @@ measure = np.mean(disp_vec)
 #    fh.write(str(measure))
 #fh.close()
 
-print(measure)
-
-plot(u, mode = "displacement", title = "single, u", interactive =True)
+#print(measure)
+#plot(mesh, interactive =True)
+#plot(u, mode = "displacement", title = "single, u", interactive =True)
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html
