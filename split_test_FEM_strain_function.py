@@ -5,19 +5,36 @@ import scipy.interpolate as inp
 import sys as sys
 from dolfin.cpp._mesh import Cell_get_cell_data, Cell_get_vertex_coordinates, Cell_normal, Cell_cell_normal, Cell_contains
 
-mesh_path = "/home/nick/git/split_test_FEM//final_xml/cut_second.xml"
-theta = -1*math.pi/2.0
-cutp = 5.0
-cutn = -5.0
-seed_num = 0
+mesh_path = sys.argv[1]
+theta = float(sys.argv[2])
+cutp = float(sys.argv[3])
+cutn = float(sys.argv[4])
+seed_num = int(sys.argv[5]) + 1000000
+stress_l = float(sys.argv[6])
+
+stress_l = 19439510#20816630.0
 
 
-r_devider = -5.0 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
-t_devider = -5.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
+r_devider = -5.23 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
+t_devider = -5.23 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
+
+#stress_l =   19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
+stress_sd_l = 9015543.0 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
+
+#np.random.seed(seed=(seed_num+10000)*5) # positive pi/2 peak
+stress_l_modifier_1 = np.random.normal(0, stress_sd_l, 1)[0] 
+
+#np.random.seed(seed=(seed_num+10000)*15) # negative pi/2 peak
+stress_l_modifier_2 = np.random.normal(0, stress_sd_l, 1)[0] 
+
+#np.random.seed(seed=(seed_num+10000)*25)
+stress_l_modifier_3 = np.random.normal(0, stress_sd_l, 1)[0] 
+
+#np.random.seed(seed=(seed_num+10000)*35)
+stress_l_modifier_4 = np.random.normal(0, stress_sd_l, 1)[0] 
 
 
-stress_l = 19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
-stress_sd_l = 8353013 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
+
 #define these if l and r/t are realted by the means etc their random distrobutions rather than by the specific l value for the cell
 #stress_t = stress_l/-3.0
 #stress_sd_t = stress_sd_l/3.0
@@ -33,46 +50,14 @@ sed = 35.99
 big_rad = bed/2.0
 small_rad = sed/2.0 
 
+mesh = Mesh(mesh_path)
 
-#generate coordinates and predetermind stress modifiers
-num_rad_slices = 6 #includes 0 and periphary ie 4 is two internal slices, 3 internal volumes
-num_theta_slices = 8
-num_vert_slices = 8 # includes ends, 3 is big and small end and one hlaf way, ie has two internal volumes
 
-#if statment to check num vert slices isnt 0
 
 def calc_rad(h, small_end_rad, big_end_rad):
     grad = big_end_height/(big_end_rad-small_end_rad)
     intersept = grad*small_end_rad
     return (h + intersept)/grad
-
-
-
-theta_slices = np.linspace(0, num_theta_slices-1, num_theta_slices)*np.pi/num_theta_slices
-theta_slices_array = np.repeat(theta_slices, (num_rad_slices))
-
-kstress = []
-for vsn in range(0, num_vert_slices):
-	h = vsn*big_end_height/(num_vert_slices-1)
-	cmr = calc_rad(h, small_rad, big_rad)
-	r_slices = np.linspace(0, num_rad_slices-1, num_rad_slices)*cmr/(num_rad_slices-1)
-	r_slices_array = np.tile(r_slices, (num_theta_slices))
-	kstress_x = r_slices_array*np.cos(theta_slices_array)
-	kstress_y = r_slices_array*np.sin(theta_slices_array)
-	kstress_x = np.append(kstress_x, kstress_x*-1)
-	kstress_y = np.append(kstress_y, kstress_y*-1)
-	kstress_t = np.dstack((kstress_x, kstress_y, np.ones(len(kstress_x))*h))
-	kstress = np.append(kstress, kstress_t)
-
-kstress = np.reshape(kstress, (len(kstress)/3, 3))
-kstress_cv = np.reshape(np.random.normal(0, stress_sd_l, len(kstress[:,1])), (len(kstress[:,1]), 1))
-kstress = np.append(kstress, kstress_cv, axis=1)
-
-interp = inp.LinearNDInterpolator(kstress[:,0:3], kstress[:,3], fill_value=0)
-
-
-mesh = Mesh(mesh_path)
-np.random.seed(seed_num)
 
 
 def irads(max_rad):
@@ -84,9 +69,6 @@ def irads(max_rad):
     return rad_array[::-1]
 
 
-
-
-
 class vstress(Expression):
     def eval(self, values, x):
 	mr = calc_rad(x[2], small_rad, big_rad)
@@ -95,21 +77,33 @@ class vstress(Expression):
 	if(rad < 0.22313*mr): 
 		rad = 0.22313*mr
 
-	GSv = stress_l*(1 + 2*math.log(rad/mr))  + interp(x[0], x[1], x[2])
+	theta_c = np.arctan2(x[1], x[0])
+
+	if(theta_c >= 0):
+		if(theta_c >= np.pi/2):
+			stress_l_theta = stress_l + stress_l_modifier_1*np.sin(theta_c)**2 + stress_l_modifier_3*np.cos(theta_c)**2
+		elif(theta_c < np.pi/2):
+			stress_l_theta = stress_l + stress_l_modifier_1*np.sin(theta_c)**2  + stress_l_modifier_4*np.cos(theta_c)**2
+		else:
+			print("error calculating what stress_l should be point 1")
+	elif(theta_c < 0):
+		if(abs(theta_c) >= np.pi/2):
+			stress_l_theta = stress_l + stress_l_modifier_2*np.sin(theta_c)**2 + stress_l_modifier_3*np.cos(theta_c)**2
+		elif(abs(theta_c) < np.pi/2):
+			stress_l_theta = stress_l + stress_l_modifier_2*np.sin(theta_c)**2 + stress_l_modifier_4*np.cos(theta_c)**2
+		else:
+			print("error calculating what stress_l should be point 2")
+	else:
+		print("error calculating what stress_l should be point 3")
+
+	GSv = stress_l_theta*(1 + 2*math.log(rad/mr))
+#	GSv = stress_l*(1 + 2*math.log(rad/mr))  + interp(x[0], x[1], x[2])
 
         values[0] = GSv
     def value_shape(self):
         return (1,)
-GSV = vstress()
+GSV = vstress(degree=3)
 
-
-
-parameters["form_compiler"]["cpp_optimize"] = True
-parameters["form_compiler"]["optimize"] = True
-ffc_options = {"optimize": True, \
-               "eliminate_zeros": True, \
-               "precompute_basis_const": True, \
-               "precompute_ip_const": True}
    
 
 class trans_angles(Expression):
@@ -145,7 +139,7 @@ class trans_angles(Expression):
 
     def value_shape(self):
         return (9,)
-trans = trans_angles()
+trans = trans_angles(degree=2)
 
 def end_boundary(x, on_boundary):
     return abs(x[2]) < 0.001
@@ -261,20 +255,11 @@ V = VectorFunctionSpace(mesh, "Lagrange", 1)
 VV = VectorFunctionSpace(mesh, "Lagrange", 1)
 VF = FunctionSpace(mesh, "Lagrange", 1)
 
-c = Expression(("0.0", "0.0", "0.0"))
+c = Expression(("0.0", "0.0", "0.0"), degree=3)
 bcs = DirichletBC(VV, c, end_boundary)
 
 domains = CellFunction("size_t", mesh)
-
-
-#class get_GS(Expression):
-#    def eval(self, values, x):
-#            values[0] = 0#np.random.normal(stress_r, stress_sd_r, 1)
-#            values[1] = 0#np.random.normal(stress_t, stress_sd_t, 1)
-#            values[2] = 10#norm_l[cd]#np.random.normal(stress_l, stress_sd_l, 1)
-#    def value_shape(self):
-#        return (3,)
-#get_gs = get_GS()     
+   
 
 du = TrialFunction(VV)            # Incremental displacement
 v  = TestFunction(VV)             # Test function
@@ -283,7 +268,7 @@ E = 0.5*(grad(u)+(grad(u)).T)
 
 GSv = GSV[0]
 
-stress1s = CMF[0,0]*E[0,0] + CMF[0,1]*E[1,1] + CMF[0,2]*(E[2,2]) + CMF[0,3]*E[1,2] + CMF[0,4]*E[0,2] + CMF[0,5]*E[0,1] + GSv/r_devider
+stress1s = CMF[0,0]*E[0,0] + CMF[0,1]*E[1,1] + CMF[0,2]*(E[2,2]) + CMF[0,3]*E[1,2] + CMF[0,4]*E[0,2] + CMF[0,5]*E[0,1]# + GSv/r_devider
 stress2s = CMF[1,0]*E[0,0] + CMF[1,1]*E[1,1] + CMF[1,2]*(E[2,2]) + CMF[1,3]*E[1,2] + CMF[1,4]*E[0,2] + CMF[1,5]*E[0,1] + GSv/t_devider
 stress3s = CMF[2,0]*E[0,0] + CMF[2,1]*E[1,1] + CMF[2,2]*(E[2,2]) + CMF[2,3]*E[1,2] + CMF[2,4]*E[0,2] + CMF[2,5]*E[0,1] + GSv
 stress4s = CMF[3,0]*E[0,0] + CMF[3,1]*E[1,1] + CMF[3,2]*(E[2,2]) + CMF[3,3]*E[1,2] + CMF[3,4]*E[0,2] + CMF[3,5]*E[0,1]
@@ -303,14 +288,14 @@ F = derivative(Pi, u, v)
 J = derivative(F, u, du)
 
 # Solve variational problem
-#parameters.form_compiler.quadrature_degree = 2
-#solve(F == 0, u, bcs, J=J, form_compiler_parameters=ffc_options)
+parameters.form_compiler.quadrature_degree = 2
+solve(F == 0, u, bcs, J=J)
 
 
 #plot(u, mode = "displacement", interactive = True)
 
 u_vec = project(u, V).vector().array()
-coor_int = interpolate(Expression(("x[0]", "x[1]", "x[2]")), V).vector().array()
+coor_int = interpolate(Expression(("x[0]", "x[1]", "x[2]"), degree=3), V).vector().array()
 new_coor = coor_int+u_vec
 num_of_verts = mesh.num_vertices()
 num_of_cells = mesh.num_cells()
@@ -352,87 +337,28 @@ mesh_coor = mesh.coordinates()
 mind = np.where(mesh_coor[:,2]>399)
 mind = mind[0]
 
-#top_points = np.zeros((len(mind),2))
-#cur_points = np.zeros((len(mind),2))
-#for ii in range(0,len(top_points)):
-#    top_points[ii,0] = mesh_coor[mind[ii],0]*math.cos(theta) + mesh_coor[mind[ii],1]*(-math.sin(theta))
-#    top_points[ii,1] = mesh_coor[mind[ii],0]*math.sin(theta) + mesh_coor[mind[ii],1]*math.cos(theta)
-#    cur_points[ii,0] = coor_cur[mind[ii],0]*math.cos(theta) + coor_cur[mind[ii],1]*(-math.sin(theta))
-#    cur_points[ii,1] = coor_cur[mind[ii],0]*math.sin(theta) + coor_cur[mind[ii],1]*math.cos(theta)
-#
-#mct = mesh_coor
-#mcc = coor_cur
-#for ii in range(0,len(top_points)):
-#    mct[mind[ii],0] = top_points[ii,0]
-#    mct[mind[ii],1] = top_points[ii,1]
-#    mcc[mind[ii],0] = cur_points[ii,0]
-#    mcc[mind[ii],1] = cur_points[ii,1]
-#
-#
-#mindp = np.where((mct[:,2]>399) & (mct[:,0]<cutp) & (mct[:,0]>cutp-1))
-#mindp = np.where((mesh_coor[:,2]>399) & (mesh_coor[:,0]<cutp) & (mesh_coor[:,0]>cutp-1))
-#
-#mindp = mindp[0]
-#mindn = np.where((mct[:,2]>399) & (mct[:,0]>cutn) & (mct[:,0]<cutn+1))
-#print(mindn)
-#mindn = np.where((mesh_coor[:,2]>399) & (mesh_coor[:,0]>cutn) & (mesh_coor[:,0]<cutn+1))
-#mindn = mindn[0]
-#if len(mindn) > len(mindp):
-#    print("diferent num of elements on each side of cut")
-#    ef = 0
-#    while len(mindn) > len(mindp):
-#        print(len(mindn), len(mindp))
-#        if ef==0:
-#            mindn = np.delete(mindn, 0)
-#            ef = 1
-#        elif ef==1:
-#            mindn = np.delete(mindn, len(mindn)-1)
-#            ef = 0
-#        else:
-#            print("ef val != 0, 1")
-#        
-#elif len(mindn) < len(mindp):
-#    print("diferent num of elements on each side of cut")
-#    ef = 0
-#    while  len(mindp) > len(mindn):
-#        print(len(mindp), len(mindn))
-#        if ef==0:
-#            mindp = np.delete(mindp, 0)
-#            ef = 1
-#        elif ef==1:
-#            mindp = np.delete(mindp, len(mindp)-1)
-#            ef = 0
-#        else:
-#            print("ef val != 0, 1")        
 
+top_points = np.zeros((len(mind),2))
+cur_points = np.zeros((len(mind),2))
+for ii in range(0,len(top_points)):
+    top_points[ii,0] = mesh_coor[mind[ii],0]*math.cos(theta) + mesh_coor[mind[ii],1]*(-math.sin(theta))
+    top_points[ii,1] = mesh_coor[mind[ii],0]*math.sin(theta) + mesh_coor[mind[ii],1]*math.cos(theta)
+    cur_points[ii,0] = coor_cur[mind[ii],0]*math.cos(theta) + coor_cur[mind[ii],1]*(-math.sin(theta))
+    cur_points[ii,1] = coor_cur[mind[ii],0]*math.sin(theta) + coor_cur[mind[ii],1]*math.cos(theta)
 
-if theta == 0:
-	print(np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0])))
-	print(np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0])))
-	measure = np.mean((np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0]))) + (np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0]))))
-elif theta == -1*math.pi/2.0:
-	print(np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0])))
-	print(np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0])))
-	measure = np.mean((np.mean(-1*(coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]<0) & (mesh_coor[:,0]>-1))),0]))) + (np.mean((coor_cur[np.where((mesh_coor[:,2]>399) & ((mesh_coor[:,0]>0) & (mesh_coor[:,0]<1))),0]))))
+pind = np.where((top_points[:,0] < 0.5) & (top_points[:,0] > 0))
+nind = np.where((top_points[:,0] > -0.5) & (top_points[:,0] < 0))
 
+pdiffv = cur_points[pind] - top_points[pind]
+ndiffv = cur_points[nind] - top_points[nind]
+
+measure = (-1*(np.mean(ndiffv[:,0])) + (np.mean(pdiffv[:,0])))
 print(measure)
-#if(abs(theta) <= math.pi/2):
-#disp_vec = mcc[mindp, 0] - mcc[mindn,0]
-#elif(abs(theta) > math.pi/2):
-#    disp_vec = coor_cur[mindn,0] - coor_cur[mindp, 0]
-#else:
-#    print("theta value poorly defined")
-#measure = np.mean(disp_vec)
+
+with open('tfile_var.csv', 'wb') as fh:
+    fh.write(str(measure))
+fh.close()
 
 
-#print(disp_vec)
-#print(np.mean(disp_vec))
-
-#with open('tfile_var.csv', 'wb') as fh:
-#    fh.write(str(measure))
-#fh.close()
-
-#print(measure)
-#plot(mesh, interactive =True)
 #plot(u, mode = "displacement", title = "single, u", interactive =True)
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html
