@@ -12,25 +12,25 @@ cutn = float(sys.argv[4])
 seed_num = int(sys.argv[5]) + 1000000
 stress_l = float(sys.argv[6])
 
-stress_l = 19439510#20816630.0
+#stress_l = 17877072.0
 
 
-r_devider = -5.23 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
-t_devider = -5.23 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
+#r_devider = -5.23 #  jacobs 1945 values in psi come to about this - stresses and strains in tree tunks as they grow
+#t_devider = -10000.0 # stress_l = 5.23* stress_transverse  -- Patterns of longitudinal and tangential maturation stresses in Eucalyptus nitens plantation trees -- find boyd 1950 it has a lot more species in it also need to find Emods
 
-#stress_l =   19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
+stress_l =   19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jacobs stresses and strian in tree trunks as they grow in length and width found the same pith stress value
 stress_sd_l = 9015543.0 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
 
-#np.random.seed(seed=(seed_num+10000)*5) # positive pi/2 peak
+np.random.seed(seed=(seed_num+10000)*5) # positive pi/2 peak
 stress_l_modifier_1 = np.random.normal(0, stress_sd_l, 1)[0] 
 
-#np.random.seed(seed=(seed_num+10000)*15) # negative pi/2 peak
+np.random.seed(seed=(seed_num+10000)*15) # negative pi/2 peak
 stress_l_modifier_2 = np.random.normal(0, stress_sd_l, 1)[0] 
 
-#np.random.seed(seed=(seed_num+10000)*25)
+np.random.seed(seed=(seed_num+10000)*25)
 stress_l_modifier_3 = np.random.normal(0, stress_sd_l, 1)[0] 
 
-#np.random.seed(seed=(seed_num+10000)*35)
+np.random.seed(seed=(seed_num+10000)*35)
 stress_l_modifier_4 = np.random.normal(0, stress_sd_l, 1)[0] 
 
 
@@ -45,7 +45,7 @@ stress_l_modifier_4 = np.random.normal(0, stress_sd_l, 1)[0]
 #assumed parameters about samples, this is what the meshes are
 big_end_height = 400 #assumed small end centred on origin
 bed = 39.55 # diameter is 29
-sed = 35.99
+sed = 34.80
 
 big_rad = bed/2.0
 small_rad = sed/2.0 
@@ -74,8 +74,8 @@ class vstress(Expression):
 	mr = calc_rad(x[2], small_rad, big_rad)
         rad = sqrt(x[0]**2+x[1]**2)
 
-	if(rad < 0.22313*mr): 
-		rad = 0.22313*mr
+	if(rad < 0.244*mr): 
+		rad = 0.244*mr
 
 	theta_c = np.arctan2(x[1], x[0])
 
@@ -96,10 +96,11 @@ class vstress(Expression):
 	else:
 		print("error calculating what stress_l should be point 3")
 
-	GSv = stress_l_theta*(1 + 2*math.log(rad/mr))
-#	GSv = stress_l*(1 + 2*math.log(rad/mr))  + interp(x[0], x[1], x[2])
+	GSv = stress_l_theta*(1 + 2.125*math.log(rad/mr))
+	#GSr = (stress_l_theta/t_devider)*(math.log(rad/mr))
+	#GSt = (stress_l_theta/t_devider)*(1 + math.log(rad/mr))
 
-        values[0] = GSv
+	values[0] = GSv
     def value_shape(self):
         return (1,)
 GSV = vstress(degree=3)
@@ -266,11 +267,11 @@ v  = TestFunction(VV)             # Test function
 u  = Function(VV)                 # Displacement from previous iteration
 E = 0.5*(grad(u)+(grad(u)).T) 
 
-GSv = GSV[0]
 
-stress1s = CMF[0,0]*E[0,0] + CMF[0,1]*E[1,1] + CMF[0,2]*(E[2,2]) + CMF[0,3]*E[1,2] + CMF[0,4]*E[0,2] + CMF[0,5]*E[0,1]# + GSv/r_devider
-stress2s = CMF[1,0]*E[0,0] + CMF[1,1]*E[1,1] + CMF[1,2]*(E[2,2]) + CMF[1,3]*E[1,2] + CMF[1,4]*E[0,2] + CMF[1,5]*E[0,1] + GSv/t_devider
-stress3s = CMF[2,0]*E[0,0] + CMF[2,1]*E[1,1] + CMF[2,2]*(E[2,2]) + CMF[2,3]*E[1,2] + CMF[2,4]*E[0,2] + CMF[2,5]*E[0,1] + GSv
+
+stress1s = CMF[0,0]*E[0,0] + CMF[0,1]*E[1,1] + CMF[0,2]*(E[2,2]) + CMF[0,3]*E[1,2] + CMF[0,4]*E[0,2] + CMF[0,5]*E[0,1] 
+stress2s = CMF[1,0]*E[0,0] + CMF[1,1]*E[1,1] + CMF[1,2]*(E[2,2]) + CMF[1,3]*E[1,2] + CMF[1,4]*E[0,2] + CMF[1,5]*E[0,1]
+stress3s = CMF[2,0]*E[0,0] + CMF[2,1]*E[1,1] + CMF[2,2]*(E[2,2]) + CMF[2,3]*E[1,2] + CMF[2,4]*E[0,2] + CMF[2,5]*E[0,1] + GSV[0]
 stress4s = CMF[3,0]*E[0,0] + CMF[3,1]*E[1,1] + CMF[3,2]*(E[2,2]) + CMF[3,3]*E[1,2] + CMF[3,4]*E[0,2] + CMF[3,5]*E[0,1]
 stress5s = CMF[4,0]*E[0,0] + CMF[4,1]*E[1,1] + CMF[4,2]*(E[2,2]) + CMF[4,3]*E[1,2] + CMF[4,4]*E[0,2] + CMF[4,5]*E[0,1]
 stress6s = CMF[5,0]*E[0,0] + CMF[5,1]*E[1,1] + CMF[5,2]*(E[2,2]) + CMF[5,3]*E[1,2] + CMF[5,4]*E[0,2] + CMF[5,5]*E[0,1] 
@@ -359,6 +360,8 @@ with open('tfile_var.csv', 'wb') as fh:
     fh.write(str(measure))
 fh.close()
 
+# measurment should be ~6.5-6.7
+#comment for script, the origonal test assumes that all strain causeing outward movment is longatudinal, however due to the material geo, a significant portion may be radial/tangential
 
 #plot(u, mode = "displacement", title = "single, u", interactive =True)
 #subdomain tut http://fenicsproject.org/documentation/tutorial/materials.html
