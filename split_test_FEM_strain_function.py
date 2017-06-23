@@ -22,6 +22,7 @@ stress_l =   19439510 #   #2014 = 7650562 #2012 = 1985117 #2013 -> 15928235  jac
 stress_sd_l = 9015543.0 # for argo samples #2014 = 6771055 #2012 = 4573265 #2013 -> 7700536
 
 #need to work out the rotation here
+#make dependent on theta
 
 np.random.seed(seed=(seed_num+10000)*5) # positive pi/2 peak
 stress_l_modifier_1 = np.random.normal(0, stress_sd_l, 1)[0] 
